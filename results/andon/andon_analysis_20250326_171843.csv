@@ -1,0 +1,14 @@
+metric,value
+sample_count,100.0
+inference_mean,402.35
+inference_median,404.0
+inference_std,76.25877992173436
+inference_min,158.0
+inference_max,553.0
+inference_95p,517.0
+e2e_mean,768.74
+e2e_median,781.5
+e2e_std,166.8415216105791
+e2e_min,423.0
+e2e_max,1160.0
+e2e_95p,1027.1

@@ -6,6 +6,7 @@ services:
       context: ..
       dockerfile: .docker/Dockerfile
     user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /app
     volumes:
       - ..:/app
       - /tmp/.X11-unix:/tmp/.X11-unix
@@ -43,3 +44,13 @@ services:
     extends: base_service
     command: >
       bash -c "python3 scripts/andon_stream.py"
+
+  local_tpu_example:
+    extends: base_service
+    command: >
+      bash -c "python3 scripts/local_stream_TPU.py"
+
+  data_sampler:
+    extends: base_service
+    command: >
+      bash -c "python3 scripts/main.py --test tpu"

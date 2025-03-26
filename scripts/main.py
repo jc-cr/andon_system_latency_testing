@@ -4,10 +4,15 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
+import os
+import sys
 
 import argparse
 from andon_stream import AndonStream
+from local_stream_CPU import LocalStreamCPU
+from local_stream_TPU import LocalStreamTPU
 
+# Cloud is implemented using google collab notebook, where the class is defined in the same notebook
 
 class DataSampler:
     """Samples data from a detection stream at regular intervals."""
@@ -203,39 +208,56 @@ class DataAnalyzer:
         print(f"  95th Perc: {self.results['end_to_end_stats']['percentile_95']:.2f}")
         print("="*50)
 
-
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description='Latency Test for Object Detection Systems')
-    parser.add_argument('--test', type=str, required=True, choices=['andon', 'cpu', 'tpu', 'cloud'],
+    parser.add_argument('--test', type=str, required=True, choices=['andon', 'cpu', 'tpu'],
                         help='Test type to run (andon, cpu, tpu, cloud)')
     parser.add_argument('--samples', type=int, default=100,
                         help='Number of samples to collect (default: 100)')
     parser.add_argument('--interval', type=float, default=0.1,
                         help='Sampling interval in seconds (default: 0.1)')
-    parser.add_argument('--output-dir', type=str, default='./results',
-                        help='Directory to save output files (default: ./results)')
+    parser.add_argument('--output_dir', type=str, default='/app/results',
+                        help='Directory to save output files (default: /app/results)')
     return parser.parse_args()
 
+
 if __name__ == "__main__":
-    # Parse command line arguments
-    args = parse_args()
-    
-    # Initialize appropriate stream based on test type
-    stream = None
-    if args.test == "andon":
-        stream = AndonStream()
-        print("Starting Andon System stream...")
-        stream.run()
-    elif args.test == "cpu":
-        # Placeholder for CPU stream implementation
-        print("CPU implementation not available yet")
-        exit(1)
-    elif args.test == "tpu":
-        # Placeholder for TPU stream implementation
-        print("TPU implementation not available yet")
-        exit(1)
-    
+    try:
+        # Parse command line arguments
+        args = parse_args()
+
+        if args.output_dir == "/app/results":
+            os.makedirs(args.output_dir, exist_ok=True)
+
+        else: 
+            os.makedirs(args.output_dir, exist_ok=True)
+        
+        # Initialize appropriate stream based on test type
+        stream = None
+        if args.test == "andon":
+            stream = AndonStream()
+            print("Starting Andon System stream...")
+            stream.run()
+        elif args.test == "cpu":
+            stream = LocalStreamCPU()
+            print("Starting local CPU stream...")
+            stream.run()
+
+        elif args.test == "tpu":
+            stream = LocalStreamTPU()
+            print("Starting local TPU stream...")
+            stream.run()
+
+        elif args.test == "cloud":
+            # Placeholder for Cloud stream implementation
+            print("Cloud implementation not available yet")
+            exit(1)
+
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
     try:
         data_sampler = DataSampler(stream, sample_interval=args.interval)
         data = data_sampler.sample(num_samples=args.samples)
@@ -250,4 +272,3 @@ if __name__ == "__main__":
             print("Stopping stream...")
             stream.stop()
             
-    print("Testing complete.")
