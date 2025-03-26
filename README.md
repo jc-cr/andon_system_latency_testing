@@ -8,8 +8,12 @@ docker-compose build
 ```
 
 ## Run
+Update `TEST_TYPE` to what you want to test. 
+The options are `cpu`, `gpu`, and `tpu`.
+
+
 
 ``bash
 cd .docker
-docker compose up data_sampler --remove-orphans --abort-on-container-exit
+TEST_TYPE=tpu docker compose up data_sampler --remove-orphans --abort-on-container-exit
 ```

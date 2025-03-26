@@ -140,7 +140,7 @@ WORKDIR /app
 
 FROM visualizer AS data_analysis
 
-RUN pip install --no-cache-dir pandas scikit-learn matplotlib
+RUN pip install --no-cache-dir pandas scikit-learn matplotlib tensorflow-cpu
 
 WORKDIR /app
 

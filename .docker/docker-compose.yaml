@@ -49,8 +49,13 @@ services:
     extends: base_service
     command: >
       bash -c "python3 scripts/local_stream_TPU.py"
+  
+  local_cpu_example:
+    extends: base_service
+    command: >
+      bash -c "python3 scripts/local_stream_CPU.py"
 
   data_sampler:
     extends: base_service
     command: >
-      bash -c "python3 scripts/main.py --test tpu"
+      bash -c "python3 scripts/main.py --test ${TEST_TYPE:-andon}"

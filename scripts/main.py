@@ -239,6 +239,7 @@ if __name__ == "__main__":
             stream = AndonStream()
             print("Starting Andon System stream...")
             stream.run()
+
         elif args.test == "cpu":
             stream = LocalStreamCPU()
             print("Starting local CPU stream...")

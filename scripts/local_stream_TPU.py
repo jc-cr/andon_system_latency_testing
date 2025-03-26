@@ -45,14 +45,13 @@ class LocalStreamTPU:
         self.camera_id = camera_id
         self.width = 640
         self.height = 480
-        self.threshold = 0.5
+        self.threshold = 0.6
         self.person_class_id = 0  # In COCO dataset, person class ID is 0
         
         # Performance metrics
         self.last_inference_time = 0
         self.last_capture_time = 0
         self.last_processing_time = 0
-        self.last_transmission_time = 3.0  # Simulated network delay (ms)
         
         # Detection results
         self.detected = False
@@ -205,7 +204,7 @@ class LocalStreamTPU:
 
     def get_latest_end_to_end_time(self):
         """
-        Get the end-to-end latency including capture, processing, and transmission time.
+        Get the end-to-end latency including capture and processing time.
         
         Returns:
             float: End-to-end latency in milliseconds or None if not available
@@ -214,8 +213,8 @@ class LocalStreamTPU:
             if self.last_inference_time <= 0:
                 return None
             
-            # Calculate total latency (capture + processing + transmission)
-            total_time = self.last_capture_time + self.last_processing_time + self.last_transmission_time
+            # Calculate total latency (capture + processing)
+            total_time = self.last_capture_time + self.last_processing_time
             return total_time
 
     def get_latest_detection_status(self):
@@ -243,7 +242,7 @@ class LocalStreamTPU:
 
 if __name__ == "__main__":
     # Simple test code
-    stream = LocalStreamTPU(camera_id=0)
+    stream = LocalStreamTPU()
     if stream.run():
         print("Stream started successfully")
         
