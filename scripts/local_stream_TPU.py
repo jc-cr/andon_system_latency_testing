@@ -1,0 +1,4 @@
+
+
+class LocalStreamTPU:
+    pass
