@@ -1,3 +1,8 @@
+"""
+Logging code for streaming scripts. Logs key times from different model deployments.
+"""
+
+
 import argparse
 import time
 import numpy as np
