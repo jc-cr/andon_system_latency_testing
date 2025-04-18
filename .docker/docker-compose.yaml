@@ -55,7 +55,7 @@ services:
     command: >
       bash -c "python3 scripts/local_stream_CPU.py"
 
-  data_sampler:
+  analysis:
     extends: base_service
     command: >
-      bash -c "python3 scripts/main.py --test ${TEST_TYPE:-andon}"
+      bash -c "python3 scripts/analyzer.py --input results/andon/andon_raw_data_20250326_171843.csv --deployment "HAAM""

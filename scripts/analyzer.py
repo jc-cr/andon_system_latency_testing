@@ -1,98 +1,86 @@
 """
-Logging code for streaming scripts. Logs key times from different model deployments.
+Analysis code for processing raw timing data from different model deployments.
+Reads existing CSV files and generates performance visualizations and reports.
 """
 
-
 import argparse
-import time
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from datetime import datetime
 import os
 import sys
-
-import argparse
-from andon_stream import AndonStream
-from local_stream_CPU import LocalStreamCPU
-from local_stream_TPU import LocalStreamTPU
-
-# Cloud is implemented using google collab notebook, where the class is defined in the same notebook
-
-class DataSampler:
-    """Samples data from a detection stream at regular intervals."""
-    def __init__(self, stream, sample_interval=0.1):
-        self.stream = stream
-        self.sample_interval = sample_interval
-        self.samples = []
-        
-    def sample(self, num_samples=100, require_detection=True):
-        """
-        Collect specified number of samples from the stream.
-        
-        Args:
-            num_samples: Number of valid samples to collect
-            require_detection: If True, only collect samples with successful detections
-            
-        Returns:
-            list: Collected samples with performance metrics
-        """
-        print(f"Starting sampling process for {num_samples} samples...")
-        collected = 0
-        
-        while collected < num_samples:
-
-            detected = self.stream.get_latest_detection_status()
+import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 
-            if detected is False:
-                time.sleep(self.sample_interval)
-                continue
+# Configure matplotlib
+plt.rcParams['figure.figsize'] = (12, 8)  # Larger default figure size
+plt.rcParams["figure.autolayout"] = True
+plt.rcParams["figure.dpi"] = 300
 
-            # Get latest inference time
-            inference_time = self.stream.get_latest_inference_time()
-            
-            # Get latest end-to-end time
-            end_to_end_time = self.stream.get_latest_end_to_end_time()
+# Set font with fallbacks to system fonts
+plt.rcParams['font.family'] = 'serif'
 
-            
-            # Skip if no valid data
-            if inference_time is None or end_to_end_time is None:
-                time.sleep(self.sample_interval)
-                continue
-            
-            # Create sample record
-            sample = {
-                'timestamp': datetime.now().isoformat(),
-                'inference_time': inference_time,
-                'end_to_end_time': end_to_end_time
-            }
-            
-            self.samples.append(sample)
-            collected += 1
-            
-            if collected % 10 == 0:
-                print(f"Collected {collected}/{num_samples} samples")
-                
-            time.sleep(self.sample_interval)
-            
-        print(f"Sampling complete. Collected {len(self.samples)} samples.")
-        return self.samples
+plt.rcParams['font.size'] = 14  # Base font size
+plt.rcParams['axes.titlesize'] = 18  # Title font size
+plt.rcParams['axes.labelsize'] = 16  # Axes labels font size
+plt.rcParams['xtick.labelsize'] = 14  # X-axis tick labels
+plt.rcParams['ytick.labelsize'] = 14  # Y-axis tick labels
+plt.rcParams['legend.fontsize'] = 14  # Legend font size
+plt.rcParams['figure.titlesize'] = 20  # Figure title size
+
 
 class DataAnalyzer:
     """
     Analyzes performance data from detection samples and
     generates visualizations and reports.
     """
-    def __init__(self, samples, deployment_type="andon"):
-        self.samples = samples
+    def __init__(self, csv_path, deployment_type=None):
+        """
+        Initialize the analyzer with data from a CSV file.
+        
+        Args:
+            csv_path (str): Path to the raw data CSV file
+            deployment_type (str, optional): Type of deployment. If None, it will be
+                                             extracted from the CSV filename.
+        """
+        self.csv_path = csv_path
+        
+        # Extract deployment type from filename if not provided
+        if deployment_type is None:
+            deployment_type = self._extract_deployment_type(csv_path)
+        
         self.deployment_type = deployment_type
-        self.df = pd.DataFrame(samples)
+        
+        # Read the data from CSV
+        try:
+            self.df = pd.read_csv(csv_path)
+            print(f"Successfully loaded data from {csv_path}")
+            print(f"Found {len(self.df)} samples")
+        except Exception as e:
+            print(f"Error loading CSV file: {e}")
+            sys.exit(1)
+            
         self.results = self._analyze()
         
+    def _extract_deployment_type(self, csv_path):
+        """Extract deployment type from the CSV filename."""
+        filename = os.path.basename(csv_path)
+        
+        # Common deployment types
+        deployment_types = ["andon", "cpu", "tpu", "cloud", "cloud_gpu"]
+        
+        for dt in deployment_types:
+            if dt in filename.lower():
+                return dt
+                
+        # If no match found, use a generic name
+        return "deployment"
+        
     def _analyze(self):
-        """Analyze the collected samples and compute statistics."""
+        """Analyze the loaded data and compute statistics."""
         if len(self.df) == 0:
+            print("Warning: No data found in the CSV file.")
             return None
             
         # Calculate basic statistics for inference time
@@ -122,9 +110,12 @@ class DataAnalyzer:
             'end_to_end_stats': end_to_end_stats
         }
         
-    def output_figures(self, output_dir="./results"):
+    def output_figures(self, output_dir=None):
         """Generate visualization figures for the data."""
-        import os
+        if output_dir is None:
+            # Use the directory of the input file as the default output directory
+            output_dir = os.path.dirname(self.csv_path)
+        
         os.makedirs(output_dir, exist_ok=True)
         
         # Create timestamp for unique filenames
@@ -138,6 +129,7 @@ class DataAnalyzer:
         plt.ylabel('Frequency')
         plt.grid(True, linestyle='--', alpha=0.7)
         plt.savefig(f"{output_dir}/{self.deployment_type}_inference_time_{timestamp}.png")
+        print(f"Saved inference time plot to {output_dir}/{self.deployment_type}_inference_time_{timestamp}.png")
         
         # Plot end-to-end time distribution
         plt.figure(figsize=(10, 6))
@@ -147,20 +139,21 @@ class DataAnalyzer:
         plt.ylabel('Frequency')
         plt.grid(True, linestyle='--', alpha=0.7)
         plt.savefig(f"{output_dir}/{self.deployment_type}_end_to_end_time_{timestamp}.png")
+        print(f"Saved end-to-end time plot to {output_dir}/{self.deployment_type}_end_to_end_time_{timestamp}.png")
         
         # Print summary to console
         self._print_summary()
         
-    def output_csv(self, output_dir="./results"):
-        """Save the raw data and analysis results to CSV files."""
-        import os
+    def output_csv(self, output_dir=None):
+        """Save the analysis results to a CSV file."""
+        if output_dir is None:
+            # Use the directory of the input file as the default output directory
+            output_dir = os.path.dirname(self.csv_path)
+            
         os.makedirs(output_dir, exist_ok=True)
         
         # Create timestamp for unique filenames
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Save raw data
-        self.df.to_csv(f"{output_dir}/{self.deployment_type}_raw_data_{timestamp}.csv", index=False)
         
         # Save analysis results
         results_df = pd.DataFrame({
@@ -187,14 +180,14 @@ class DataAnalyzer:
         })
         
         results_df.to_csv(f"{output_dir}/{self.deployment_type}_analysis_{timestamp}.csv", index=False)
-        print(f"Results saved to {output_dir}")
+        print(f"Saved analysis results to {output_dir}/{self.deployment_type}_analysis_{timestamp}.csv")
         
     def _print_summary(self):
         """Print a summary of the analysis results to the console."""
         print("\n" + "="*50)
         print(f"PERFORMANCE SUMMARY - {self.deployment_type.upper()}")
         print("="*50)
-        print(f"Samples collected: {self.results['sample_count']}")
+        print(f"Samples analyzed: {self.results['sample_count']}")
         
         print("\nINFERENCE TIME STATISTICS (ms):")
         print(f"  Mean:      {self.results['inference_stats']['mean']:.2f}")
@@ -213,68 +206,33 @@ class DataAnalyzer:
         print(f"  95th Perc: {self.results['end_to_end_stats']['percentile_95']:.2f}")
         print("="*50)
 
+
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description='Latency Test for Object Detection Systems')
-    parser.add_argument('--test', type=str, required=True, choices=['andon', 'cpu', 'tpu'],
-                        help='Test type to run (andon, cpu, tpu, cloud)')
-    parser.add_argument('--samples', type=int, default=100,
-                        help='Number of samples to collect (default: 100)')
-    parser.add_argument('--interval', type=float, default=0.1,
-                        help='Sampling interval in seconds (default: 0.1)')
-    parser.add_argument('--output_dir', type=str, default='/app/results',
-                        help='Directory to save output files (default: /app/results)')
+    parser = argparse.ArgumentParser(description='Analyze latency data from CSV files')
+    parser.add_argument('--input', type=str, required=True,
+                        help='Path to the raw data CSV file')
+    parser.add_argument('--deployment', type=str, default=None,
+                        help='Deployment type label (default: auto-detected from filename)')
+    parser.add_argument('--output_dir', type=str, default=None,
+                        help='Directory to save output files (default: same as input file)')
     return parser.parse_args()
 
 
-if __name__ == "__main__":
-    try:
-        # Parse command line arguments
-        args = parse_args()
-
-        if args.output_dir == "/app/results":
-            os.makedirs(args.output_dir, exist_ok=True)
-
-        else: 
-            os.makedirs(args.output_dir, exist_ok=True)
-        
-        # Initialize appropriate stream based on test type
-        stream = None
-        if args.test == "andon":
-            stream = AndonStream()
-            print("Starting Andon System stream...")
-            stream.run()
-
-        elif args.test == "cpu":
-            stream = LocalStreamCPU()
-            print("Starting local CPU stream...")
-            stream.run()
-
-        elif args.test == "tpu":
-            stream = LocalStreamTPU()
-            print("Starting local TPU stream...")
-            stream.run()
-
-        elif args.test == "cloud":
-            # Placeholder for Cloud stream implementation
-            print("Cloud implementation not available yet")
-            exit(1)
-
-    except Exception as e:
-        print(f"Error: {e}")
+def main():
+    """Main function to analyze latency data from CSV files."""
+    args = parse_args()
+    
+    # Check if input file exists
+    if not os.path.isfile(args.input):
+        print(f"Error: Input file '{args.input}' does not exist.")
         sys.exit(1)
+    
+    # Create analyzer and process the data
+    analyzer = DataAnalyzer(args.input, deployment_type=args.deployment)
+    analyzer.output_figures(output_dir=args.output_dir)
+    analyzer.output_csv(output_dir=args.output_dir)
 
-    try:
-        data_sampler = DataSampler(stream, sample_interval=args.interval)
-        data = data_sampler.sample(num_samples=args.samples)
-        
-        analyzer = DataAnalyzer(data, deployment_type=args.test)
-        analyzer.output_figures(output_dir=args.output_dir)
-        analyzer.output_csv(output_dir=args.output_dir)
-        
-    finally:
-        # Clean up
-        if stream:
-            print("Stopping stream...")
-            stream.stop()
-            
+
+if __name__ == "__main__":
+    main()
